@@ -1,0 +1,106 @@
+package disease;
+import model.Patient;
+import model.PatientDisease;
+import java.time.LocalDate;
+import java.util.*;
+
+declare isGerd
+id:int @key
+end
+
+
+rule "Dysphagia"
+when
+$patient: Patient(ICD10=="R13.1" || ICD10=="R13.19"||ICD10=="R13.12"||ICD10=="R13.13"||ICD10=="R13.14")
+$patientdisease: PatientDisease()
+then
+$patientdisease.addPatient($patient,"Dysphagia");
+end
+
+rule "Weight Loss"
+when
+$patient: Patient(ICD10=="R63.4" || ICD10=="E64.0"||ICD10=="E46"||ICD10=="E44.0"||ICD10=="E44.1"|| ICD10=="E45")
+$patientdisease: PatientDisease()
+then
+$patientdisease.addPatient($patient,"Weight Loss");
+end
+
+rule "GERD"
+when
+$patient: Patient(ICD10=="K21.0" || ICD10=="K21.9")
+$patientdisease: PatientDisease()
+then
+$patientdisease.addPatient($patient,"GERD");
+insertLogical(new isGerd($patient.getId()));
+end
+
+rule "disease1"
+
+  when
+    $d:LocalDate()
+    $patientdisease: PatientDisease()
+    $patient : Patient(status=="Active" && timeframe.isAfter($d.minusMonths(6)) && $patientdisease.checkDisease($patient))
+  then
+    $patient.setPreFill("Y");
+end
+
+rule "checkmultiple"
+
+    when
+        $patientdisease: PatientDisease()
+        $patient: Patient($patientdisease.checkMultiple($patient))
+    then
+        $patient.setMultiple("Y");
+end
+
+
+rule "Hiatal Hernia"
+when
+$patient: Patient(ICD10=="K40" || ICD10=="K41")
+$patientdisease: PatientDisease()
+$gerd:isGerd(id==$patient.getId())
+then
+$patient.addRisk("Hiatal Hernia");
+$patientdisease.addPatientwithRisk($patient);
+end
+
+rule "Elevated BMI"
+when
+
+$patient: Patient(ICD10=="E66.9" || ICD10=="E66")
+$patientdisease: PatientDisease()
+$gerd:isGerd(id==$patient.getId())
+then
+$patient.addRisk("Elevated BMI");
+$patientdisease.addPatientwithRisk($patient);
+end
+
+rule "Tobacco Usage"
+when
+$patient: Patient(ICD10=="Z72.0" || ICD10=="F17.220" && smokingStatus =="Positive" && status=="Active")
+$patientdisease: PatientDisease()
+$gerd:isGerd(id==$patient.getId())
+then
+$patient.addRisk("Tobacco Usage");
+$patientdisease.addPatientwithRisk($patient);
+end
+
+rule "White Male"
+when
+$patient: Patient(gender== "Male" && race=="White" && status=="Active")
+$patientdisease: PatientDisease()
+$gerd:isGerd(id==$patient.getId())
+then
+$patient.addRisk("White Male");
+$patientdisease.addPatientwithRisk($patient);
+end
+
+rule "Check number"
+when
+    $patient: Patient()
+    $gerd: isGerd(id==$patient.getId())
+    $patientdisease: PatientDisease(this.checkMultipleRisk($patient))
+then
+    $patient.setMultipleG("Y");
+    $patientdisease.addPatientWithMultipleG($patient);
+end
